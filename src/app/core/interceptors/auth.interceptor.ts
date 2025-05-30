@@ -1,20 +1,25 @@
-import { Injectable } from '@angular/core';
+import { inject } from '@angular/core';
 import {
-  HttpInterceptor,
+  HttpInterceptorFn,
   HttpRequest,
-  HttpHandler,
+  HttpHandlerFn,
   HttpEvent
 } from '@angular/common/http';
 import { catchError, Observable, switchMap, throwError } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 
-@Injectable()
-export class AuthInterceptor implements HttpInterceptor {
-constructor(private authService: AuthService) {}
+export const authInterceptor: HttpInterceptorFn = (
+  req: HttpRequest<any>,
+  next: HttpHandlerFn
+): Observable<HttpEvent<any>> => {
+  const authService = inject(AuthService);
 
-intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-  if (req.url.includes('/token') || req.url.includes('/login') || req.url.includes('/register')) {
-    return next.handle(req);
+  if (
+    req.url.includes('/token') ||
+    req.url.includes('/login') ||
+    req.url.includes('/register')
+  ) {
+    return next(req);
   }
 
   const accessToken = localStorage.getItem('access_token');
@@ -28,10 +33,10 @@ intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> 
     });
   }
 
-  return next.handle(cloned).pipe(
+  return next(cloned).pipe(
     catchError(error => {
       if (error.status === 401) {
-        return this.authService.refreshToken().pipe(
+        return authService.refreshToken().pipe(
           switchMap(() => {
             const newToken = localStorage.getItem('access_token');
             const newReq = req.clone({
@@ -39,13 +44,11 @@ intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> 
                 Authorization: `Bearer ${newToken}`
               }
             });
-            return next.handle(newReq);
+            return next(newReq);
           })
         );
       }
       return throwError(() => error);
     })
   );
-}
-
-}
+};

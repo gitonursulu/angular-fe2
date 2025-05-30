@@ -3,6 +3,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
 import { Location } from '@angular/common';
 import { BehaviorSubject, catchError, Observable, tap, throwError } from 'rxjs';
+import { Inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -12,7 +14,8 @@ export class AuthService {
   constructor(
     private http: HttpClient,
     private route: ActivatedRoute,
-    private location: Location
+    private location: Location,
+    @Inject(PLATFORM_ID) private platformId: Object
   ) {
     this.loadUserFromToken();
   }
@@ -28,11 +31,13 @@ export class AuthService {
   }
 
   loadUserFromToken() {
-    const token = localStorage.getItem('token');
-    if (token) {
-      const parsed = this.parseToken(JSON.parse(token).access_token);
-      console.log('PARSED TOKEN:', parsed);
-      this.userSubject.next(parsed);
+    if (isPlatformBrowser(this.platformId)) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const parsed = this.parseToken(JSON.parse(token).access_token);
+        console.log('PARSED TOKEN:', parsed);
+        this.userSubject.next(parsed);
+      }
     }
   }
 
@@ -79,30 +84,30 @@ export class AuthService {
   }
 
   refreshToken(): Observable<any> {
-  const refreshToken = localStorage.getItem('refresh_token');
-  if (!refreshToken) {
-    this.logout();
-    return throwError(() => new Error('No refresh token found'));
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) {
+      this.logout();
+      return throwError(() => new Error('No refresh token found'));
+    }
+
+    const body = new HttpParams()
+      .set('grant_type', 'refresh_token')
+      .set('client_id', 'business-portal')
+      .set('client_secret', '...') // aynı secret
+      .set('refresh_token', refreshToken);
+
+    return this.http
+      .post('http://localhost:8080/realms/nexus/protocol/openid-connect/token', body)
+      .pipe(
+        tap((tokenRes: any) => {
+          localStorage.setItem('access_token', tokenRes.access_token);
+          localStorage.setItem('refresh_token', tokenRes.refresh_token);
+          this.loadUserFromToken();
+        }),
+        catchError(err => {
+          this.logout();
+          return throwError(() => err);
+        })
+      );
   }
-
-  const body = new HttpParams()
-    .set('grant_type', 'refresh_token')
-    .set('client_id', 'business-portal')
-    .set('client_secret', '...') // aynı secret
-    .set('refresh_token', refreshToken);
-
-  return this.http
-    .post('http://localhost:8080/realms/nexus/protocol/openid-connect/token', body)
-    .pipe(
-      tap((tokenRes: any) => {
-        localStorage.setItem('access_token', tokenRes.access_token);
-        localStorage.setItem('refresh_token', tokenRes.refresh_token);
-        this.loadUserFromToken();
-      }),
-      catchError(err => {
-        this.logout();
-        return throwError(() => err);
-      })
-    );
-}
 }

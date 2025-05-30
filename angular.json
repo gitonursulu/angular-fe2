@@ -36,7 +36,13 @@
             ],
             "styles": [
               "src/styles.css"
-            ]
+            ],
+            "server":"src/main.ts",
+            "prerender": {
+              "routesFile": "prerender-routes.txt",
+              "discoverRoutes": false
+            },
+            "ssr": false
           },
           "configurations": {
             "production": {
@@ -74,6 +80,35 @@
           },
           "defaultConfiguration": "development"
         },
+        "server": {
+          "builder": "@angular-devkit/build-angular:server",
+          "options": {
+            "outputPath": "dist/angular-fe2/server",
+            "main": "src/main.server.ts",
+            "tsConfig": "tsconfig.server.json"
+          },
+          "configurations": {
+            "production": {
+              "outputHashing": "media",
+              "sourceMap": false,
+              "optimization": true
+            },
+            "development": {
+              "outputHashing": "media",
+              "sourceMap": true,
+              "optimization": false
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "prerender": {
+          "builder": "@angular-devkit/build-angular:prerender",
+          "options": {
+            "browserTarget": "angular-fe2:build:production",
+            "serverTarget": "angular-fe2:server:production",
+            "routes": ["/home"]
+          }
+        },
         "extract-i18n": {
           "builder": "@angular/build:extract-i18n"
         },
@@ -98,5 +133,8 @@
         }
       }
     }
+  },
+  "cli": {
+    "analytics": false
   }
 }
